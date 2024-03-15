@@ -1,0 +1,9 @@
+syntax = "proto3"; 
+
+// package beacon.routing; 
+package data.users; 
+
+message UserProfile { 
+    int64 id = 1; 
+    string email = 2; 
+} 

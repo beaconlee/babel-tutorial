@@ -13,7 +13,7 @@ using index_arr_t = std::vector<std::size_t>;
 
 // point_index_t 是对当前点的一个封装，
 using point_index_t = std::pair<std::vector<double>, std::size_t>;
-
+using point_index_arr_t = std::vector<point_index_t>;
 
 class KDNode
 {
@@ -82,6 +82,48 @@ inline double dist2(const KDNodePtr&, const KDNodePtr&);
 inline double dist(const point_t&, const point_t&);
 inline double dist(const KDNodePtr&, const KDNodePtr&);
 
+class KDTree
+{
+public:
+  KDTree() = default;
 
+  explicit KDTree(point_arr_t point_arr);
+
+private:
+  KDNodePtr Nearest(const KDNodePtr& root,
+                    const point_t& target_point,
+                    const size_t& dimen,
+                    const KDNodePtr& best_point,
+                    const double& best_dist);
+
+  KDNodePtr Nearest(const point_t& target_point);
+
+public:
+  point_t NearestPoint(const point_t& point);
+  size_t NearestIndex(const point_t& point);
+  point_index_t NearestPointIndex(const point_t& point);
+
+private:
+  point_index_arr_t Neighborhood(const KDNodePtr& root,
+                                 const point_t& point,
+                                 const double& radius,
+                                 const size_t& level);
+
+public:
+  point_index_arr_t Neighborhood(const point_t& point, const double& radius);
+
+  point_arr_t NeighborhoodPoints(const point_t& point, const double& radius);
+
+  index_arr_t NeighborhoodIndices(const point_t& point, const double& radius);
+
+private:
+  KDNodePtr root_;
+  KDNodePtr leaf_;
+
+  KDNodePtr MakeTree(const point_index_arr_t::iterator& begin,
+                     const point_index_arr_t::iterator& end,
+                     const size_t& length,
+                     const size_t& level);
+};
 
 } // namespace beacon

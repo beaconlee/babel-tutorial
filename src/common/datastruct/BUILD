@@ -11,8 +11,7 @@ cc_library(
 cc_binary(
     name = "kd_tree_test",
     srcs = [
-        "kd_tree.cc",
-        "kd_tree.h",
         "kd_tree_test.cc",
     ],
+    deps = [":kd_tree"],
 )

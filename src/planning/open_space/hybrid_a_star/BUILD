@@ -1,0 +1,27 @@
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "hybrid_a_star",
+    srcs = [
+        "hybrid_a_star.cc",
+        "hybrid_a_star.h",
+        "reeds_sheep_path.cc",
+        "reeds_sheep_path.h",
+        "trajectory_node.cc",
+        "trajectory_node.h",
+    ],
+    copts = ["-fPIC"],  # Add -fPIC option here
+    deps = [
+        "//src/planning/open_space/a_star:a_star",
+    ],
+)
+
+cc_binary(
+    name = "hybrid_a_star_test",
+    srcs = [
+        "hybrid_a_star_test.cc",
+    ],
+    deps = [
+        ":hybrid_a_star",
+    ],
+)

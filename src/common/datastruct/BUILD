@@ -8,6 +8,13 @@ cc_library(
     ],
 )
 
+cc_library(
+    name = "priority",
+    srcs = [
+        "priority_queue.h",
+    ],
+)
+
 cc_binary(
     name = "kd_tree_test",
     srcs = [

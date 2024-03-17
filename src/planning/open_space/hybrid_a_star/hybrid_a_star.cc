@@ -1,5 +1,6 @@
 #include "hybrid_a_star.h"
 #include "src/common/utils.h"
+#include "src/common/datastruct/priority_queue.h"
 #include <queue>
 
 namespace beacon
@@ -101,7 +102,7 @@ Status HybridAStar::Plan(Eigen::Vector3d start,
                       std::vector<std::pair<int, double>>,
                       cmp>
       q_priority;
-
+  // PriorityQueue<Eigen::Vector2d, double> frontier;
   q_priority.push(
       std::make_pair(CalcIndex(tn_start), CalcHybridCost(tn_start)));
 
@@ -110,6 +111,17 @@ Status HybridAStar::Plan(Eigen::Vector3d start,
   DEBUG_LOG
   while(true)
   {
+    if(open_set.empty())
+    {
+      return Status::ERROR;
+    }
+
+    int idx = q_priority.top().first;
+    q_priority.pop();
+    std::shared_ptr<TrajectoryNode> curr_node = open_set[idx];
+    open_set.erase(idx);
+
+    bool update = ReedsSheepPath(curr_node, tn_goal, rs_node);
   }
 }
 
@@ -179,5 +191,154 @@ void HybridAStar::CalcParameters(point_arr_t points)
       minx, miny, minyaw, maxx, maxy, maxyaw, xw, yw, yaww, XY_RESO, YAW_RESO));
 
   frame_->obs = std::make_shared<KDTree>(points);
+}
+
+std::shared_ptr<TrajectoryNode> HybridAStar::CalcNextNode(
+    std::shared_ptr<TrajectoryNode>& curr_node, int c_id, double u, int d)
+{
+  // c++ 的取整函数
+  // 1. ceil 函数，向上取整
+  // 2. floor 函数，向下取整
+  // 3. fix 函数，向 0 取整
+  // 4. round 函数，四舍五入
+
+  double step = XY_RESO * 2.5;
+  int nlist = std::ceil(
+      step / MOVE_STEP); // 使用布长除以移动分辨率，得到一个 node 里面点的个数
+
+  std::vector<double> xlist = {curr_node->x_list_.back() +
+                               d * MOVE_STEP *
+                                   cos(curr_node->yaw_list_.back())};
+
+  std::vector<double> ylist = {curr_node->y_list_.back() +
+                               d * MOVE_STEP *
+                                   sin(curr_node->yaw_list_.back())};
+
+  std::vector<double> yawlist = {
+      Mod2Pi(curr_node->yaw_list_.back() +
+             d * MOVE_STEP / frame_->vc.whell_base_ * tan(u))};
+
+  for(size_t idx = 0; idx < nlist - 1; ++idx)
+  {
+    xlist.push_back(xlist[idx] + d * MOVE_STEP * cos(yawlist[idx]));
+    ylist.push_back(ylist[idx] + d * MOVE_STEP * sin(yawlist[idx]));
+    yawlist.push_back(
+        Mod2Pi(yawlist[idx] + d * MOVE_STEP / frame_->vc.whell_base_ * tan(u)));
+  }
+
+  // 通过放缩得到原来的坐标，并进行四舍五入
+  int xind = std::round(xlist.back() / XY_RESO);
+  int yind = std::round(ylist.back() / XY_RESO);
+  int yawind = std::round(yawlist.back() / YAW_RESO);
+
+  if(!IsIndexOk(xind, yind, xlist, ylist, yawlist))
+  {
+    return {};
+  }
+
+  double cost = 0.;
+  int direction = 1;
+
+  if(d > 0)
+  {
+    direction = 1;
+    cost += abs(step);
+  }
+  else
+  {
+    direction = -1;
+    cost += abs(step) * BACKWARD_COST;
+  }
+
+  if(direction != curr_node->direction_)
+  {
+    cost += GEAR_COST;
+  }
+
+  cost += STEER_ANGLE_COST * abs(u);
+  cost += STEER_CHANGE_COST * abs(curr_node->steer_ - u);
+  cost += curr_node->cost_;
+  std::vector<int> directions(xlist.size(), direction);
+
+  return std::make_shared<TrajectoryNode>(xind,
+                                          yind,
+                                          yawind,
+                                          direction,
+                                          xlist,
+                                          ylist,
+                                          yawlist,
+                                          directions,
+                                          u,
+                                          cost,
+                                          c_id);
+}
+
+
+bool HybridAStar::IsIndexOk(int xind,
+                            int yind,
+                            const std::vector<double>& xlist,
+                            const std::vector<double>& ylist,
+                            const std::vector<double>& yawlist)
+{
+  if(xind <= frame_->para_->minx_ || xind >= frame_->para_->maxx_ ||
+     yind <= frame_->para_->miny_ || yind >= frame_->para_->maxy_)
+  {
+    return false;
+  }
+
+  std::vector<double> nodex;
+  std::vector<double> nodey;
+  std::vector<double> nodeyaw;
+  for(size_t idx = 0; idx < xlist.size(); idx += COLLISION_CHECK_STEP)
+  {
+    nodex.push_back(xlist[idx]);
+    nodey.push_back(ylist[idx]);
+    nodeyaw.push_back(yawlist[idx]);
+  }
+
+  if(IsCollision(nodex, nodey, nodeyaw))
+  {
+    return false;
+  }
+
+  return true;
+}
+
+
+bool HybridAStar::IsCollision(std::vector<double>& x,
+                              std::vector<double>& y,
+                              std::vector<double>& yaw)
+{
+  for(size_t idx = 0; idx < x.size(); ++idx)
+  {
+    int d = 1;
+    double dl = (frame_->vc.rf_ - frame_->vc.rb_) / 2.0;
+    double r = (frame_->vc.rf_ + frame_->vc.rb_) / 2.0 + d;
+    double cx = x[idx] + dl * cos(yaw[idx]);
+    double cy = y[idx] + dl * sin(yaw[idx]);
+    std::vector<point_t> ids = frame_->obs->NeighborhoodPoints({cx, cy}, r);
+
+    for(const point_t& ob : ids)
+    {
+      double xo = ob[0] - cx;
+      double yo = ob[1] - cy;
+      double dx = xo * cos(yaw[idx]) + yo * sin(yaw[idx]);
+      double dy = -xo * sin(yaw[idx]) + yo * cos(yaw[idx]);
+
+      if(abs(dx) < r && abs(dy) < frame_->vc.width_ / 2 + d)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+bool HybridAStar::ReedsSheepPath(std::shared_ptr<TrajectoryNode> n_curr,
+                                 std::shared_ptr<TrajectoryNode> ngoal,
+                                 std::shared_ptr<TrajectoryNode>& fpath)
+{
+  
 }
 } // namespace beacon

@@ -14,7 +14,7 @@ refresh_compile_commands(
     name = "refresh_compile_commands",
     # 指定目标 target 及其编译选项/参数（.bazelrc 中已有的参数/选项无需重复添加）
     targets = {
-        "//:install": "",
+        "//src/planning/open_space/hybrid_a_star:hybrid_a_star_test": "",
     },
 )
 

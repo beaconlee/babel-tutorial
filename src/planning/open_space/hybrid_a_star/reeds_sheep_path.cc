@@ -22,7 +22,6 @@ inline void Polar(double x, double y, double& radius, double& theta)
   theta = std::atan2(y, x);
 }
 
-
 double Mod2Pi(double theta)
 {
   while(theta < M_PI)
@@ -50,10 +49,6 @@ int32_t Sign(double num)
   return 0;
 }
 
-} // namespace
-
-namespace beacon
-{
 inline bool
 SpLpSp(double x, double y, double phi, double& t, double& u, double& v)
 {
@@ -79,10 +74,381 @@ LpSpLp(double x, double y, double phi, double& t, double& u, double& v)
 }
 
 
-ReedsSheppPath GenReedsSheppPath(Eigen::Vector3d start,
-                                 Eigen::Vector3d goal,
-                                 double maxc,
-                                 double step_size)
+
+void SetPath(std::vector<beacon::ReedsSheppPath>& paths,
+             double t,
+             double u,
+             double v,
+             std::vector<char> ctypes,
+             double step_size)
+{
+  beacon::ReedsSheppPath path = {
+      std::vector<double>{t, u, v},
+      std::vector<char>{'S', 'L', 'S'},
+      double(std::abs(t) + std::abs(u) + std::abs(v))};
+
+  for(auto i_path : paths)
+  {
+    bool type_is_same = (i_path.char_ == path.char_);
+    bool length_is_close = ((i_path.l_ - path.l_) <= step_size);
+    if(type_is_same && length_is_close)
+    {
+      return;
+    }
+  }
+
+  if(path.l_ <= step_size)
+  {
+    return;
+  }
+
+  paths.emplace_back(std::vector<double>{t, u, v},
+                     std::vector<char>{'S', 'L', 'S'},
+                     double(std::abs(t) + std::abs(u) + std::abs(v)));
+}
+
+
+void StraightCurveStraight(double x,
+                           double y,
+                           double phi,
+                           std::vector<beacon::ReedsSheppPath>& paths,
+                           double step_size)
+{
+  double t, u, v;
+}
+
+
+void CurveStraightCurve(double x,
+                        double y,
+                        double phi,
+                        std::vector<beacon::ReedsSheppPath>& paths,
+                        double step_size)
+{
+  double t, u, v;
+  if(LpSpLp(x, y, phi, t, u, v))
+  {
+    SetPath(paths, t, u, v, {'S', 'L', 'S'}, step_size);
+  }
+}
+
+void CurveCurveCurve(double x,
+                     double y,
+                     double phi,
+                     std::vector<beacon::ReedsSheppPath>& paths,
+                     double step_size)
 {}
+
+
+
+} // namespace
+
+namespace beacon
+{
+
+
+
+ReedsSheppPath
+ReedsShepp::AnalysticExpantion(std::shared_ptr<TrajectoryNode> start,
+                               std::shared_ptr<TrajectoryNode> goal,
+                               std::shared_ptr<Frame>& frame,
+                               double step_size)
+{
+  Eigen::Vector3d v3d_start(
+      start->x_list_.back(), start->y_list_.back(), start->yaw_list_.back());
+  Eigen::Vector3d v3d_goal(
+      goal->x_list_.back(), goal->y_list_.back(), goal->yaw_list_.back());
+
+  double maxc = std::tan(frame->vc.max_steer_) / frame->vc.whell_base_;
+  DEBUG_LOG
+
+  auto paths = CalcRSPaths(v3d_start, v3d_goal, maxc, step_size);
+  DEBUG_LOG
+
+  if(paths.empty())
+  {
+    return {};
+  }
+  DEBUG_LOG
+  LOG(paths.size())
+
+  std::sort(
+      std::begin(paths),
+      std::end(paths),
+      [&frame, this](const ReedsSheppPath& path_a, const ReedsSheppPath& path_b)
+      {
+        DEBUG_LOG
+
+        return CalcRspathCost(path_a, frame) < CalcRspathCost(path_b, frame);
+      });
+  DEBUG_LOG
+
+  for(auto path : paths)
+  {
+    std::vector<double> path_x;
+    std::vector<double> path_y;
+    std::vector<double> path_yaw;
+    for(size_t idx = 0; idx < path.x_vec_.size(); idx += COLLISION_CHECK_STEP)
+    {
+      path_x.push_back(path.x_vec_[idx]);
+      path_y.push_back(path.y_vec_[idx]);
+      path_yaw.push_back(path.yaw_vec_[idx]);
+    }
+    if(!IsCollision(path_x, path_y, path_yaw, frame))
+    {
+      return path;
+    }
+  }
+
+  return {};
+}
+
+std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
+                                                    Eigen::Vector3d goal,
+                                                    double max_curvature,
+                                                    double step_size)
+{
+  DEBUG_LOG
+  std::vector<ReedsSheppPath> paths =
+      GenReedsSheppPath(start, goal, max_curvature, step_size);
+
+  for(ReedsSheppPath& path : paths)
+  {
+    std::vector<std::vector<double>> status =
+        SolveRSPath(path.lengths_, path.char_, max_curvature, step_size);
+
+    for(size_t idx = 0; idx < status[0].size(); ++idx)
+    {
+      double ix = status[0][idx];
+      double iy = status[1][idx];
+      double yaw = status[2][idx];
+
+      int direction = static_cast<int>(status[3][idx]);
+
+      path.x_vec_.emplace_back(
+          std::cos(-start[2] * ix + std::sin(-start[2]) * iy + start[0]));
+      path.y_vec_.emplace_back(
+          std::sin(-start[2] * ix + std::cos(-start[2]) * iy + start[1]));
+      path.yaw_vec_.emplace_back(Mod2Pi(yaw + start[2]));
+      path.direc_vec_.emplace_back(direction);
+    }
+
+    for(size_t idx = 0; idx < path.lengths_.size(); ++idx)
+    {
+      path.lengths_[idx] /= max_curvature;
+    }
+    path.l_ /= max_curvature; 
+  }
+
+
+  return paths;
+}
+
+
+std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
+                                                          Eigen::Vector3d goal,
+                                                          double max_curvature,
+                                                          double step_size)
+{
+  double dx = goal.x() - start.x();
+  double dy = goal.y() - start.y();
+  double dth = goal.z() - start.z();
+  double c = cos(start.z());
+  double s = sin(start.z());
+  double x = (c * dx + s * dy) * max_curvature;
+  double y = (-s * dx + c * dy) * max_curvature;
+
+  std::vector<ReedsSheppPath> paths;
+
+  StraightCurveStraight(x, y, dth, paths, step_size);
+  CurveStraightCurve(x, y, dth, paths, step_size);
+  CurveCurveCurve(x, y, dth, paths, step_size);
+
+  return paths;
+}
+
+double ReedsShepp::CalcRspathCost(ReedsSheppPath rspath,
+                                  std::shared_ptr<Frame>& frame)
+{
+  double cost = 0.0;
+  DEBUG_LOG
+
+  for(auto lr : rspath.lengths_)
+  {
+    if(lr >= 0)
+    {
+      cost += 1;
+    }
+    else
+    {
+      cost += std::abs(lr) * BACKWARD_COST;
+    }
+  }
+  DEBUG_LOG
+
+  for(size_t idx = 0; idx < rspath.lengths_.size() - 1; ++idx)
+  {
+    if(rspath.lengths_[idx] * rspath.lengths_[idx + 1] < 0.)
+    {
+      cost += GEAR_COST;
+    }
+  }
+  DEBUG_LOG
+
+  for(char ctype : rspath.char_)
+  {
+    if(ctype != 'S')
+    {
+      cost += STEER_ANGLE_COST * std::abs(frame->vc.max_steer_);
+    }
+  }
+  DEBUG_LOG
+
+  std::vector<double> ulist(rspath.char_.size(), 0);
+  for(size_t idx = 0; idx < rspath.char_.size(); ++idx)
+  {
+    if(rspath.char_[idx] == 'R')
+    {
+      ulist[idx] = -frame->vc.max_steer_;
+    }
+    else if(rspath.char_[idx] == 'L')
+    {
+      ulist[idx] = frame->vc.max_steer_;
+    }
+  }
+  DEBUG_LOG
+
+  for(size_t idx = 0; idx < rspath.char_.size(); ++idx)
+  {
+    cost += (STEER_CHANGE_COST * std::abs(ulist[idx + 1] - ulist[idx]));
+  }
+
+  return cost;
+}
+
+
+bool ReedsShepp::IsCollision(std::vector<double>& x,
+                             std::vector<double>& y,
+                             std::vector<double>& yaw,
+                             std::shared_ptr<Frame>& frame)
+{
+  for(size_t idx = 0; idx < x.size(); ++idx)
+  {
+    int d = 1;
+    double dl = (frame->vc.rf_ - frame->vc.rb_) / 2.0;
+    double r = (frame->vc.rf_ + frame->vc.rb_) / 2.0 + d;
+    double cx = x[idx] + dl * cos(yaw[idx]);
+    double cy = y[idx] + dl * sin(yaw[idx]);
+    std::vector<point_t> ids = frame->obs->NeighborhoodPoints({cx, cy}, r);
+
+    for(const point_t& ob : ids)
+    {
+      double xo = ob[0] - cx;
+      double yo = ob[1] - cy;
+      double dx = xo * cos(yaw[idx]) + yo * sin(yaw[idx]);
+      double dy = -xo * sin(yaw[idx]) + yo * cos(yaw[idx]);
+
+      if(abs(dx) < r && abs(dy) < frame->vc.width_ / 2 + d)
+      {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+std::vector<std::vector<double>>
+ReedsShepp::SolveRSPath(std::vector<double> lengths,
+                        std::vector<char> modes,
+                        double max_curvature,
+                        double step_size)
+{
+  std::vector<std::vector<double>> interpolate_dists_list =
+      CalcInterpolateDistsList(lengths, step_size);
+
+  Eigen::Vector3d origin(0, 0, 0);
+  std::vector<double> xs;
+  std::vector<double> ys;
+  std::vector<double> yaws;
+  std::vector<double> directions;
+
+  for(size_t idx = 0; idx < lengths.size(); ++idx)
+  {
+    for(double dist : interpolate_dists_list[idx])
+    {
+      Eigen::Vector4d state =
+          Interpolate(dist, lengths[idx], modes[idx], max_curvature, origin);
+      xs.push_back(state[0]);
+      ys.push_back(state[1]);
+      yaws.push_back(state[2]);
+      directions.push_back(state[3]);
+    }
+    origin[0] = xs.back();
+    origin[1] = ys.back();
+    origin[2] = yaws.back();
+  }
+
+  return {xs, ys, yaws, directions};
+}
+
+
+
+std::vector<std::vector<double>>
+ReedsShepp::CalcInterpolateDistsList(std::vector<double> lengths,
+                                     double step_size)
+{
+  std::vector<std::vector<double>> interpolate_dists_list;
+  for(double length : lengths)
+  {
+    std::vector<double> interp_dists;
+    int len_sign = Sign(length);
+    for(double d = 0; d < abs(length); d += step_size)
+    {
+      interp_dists.push_back(len_sign * d);
+    }
+    interp_dists.push_back(length);
+    interpolate_dists_list.emplace_back(interp_dists);
+  }
+
+  return interpolate_dists_list;
+}
+
+
+Eigen::Vector4d ReedsShepp::Interpolate(double dist,
+                                        double length,
+                                        char mode,
+                                        double max_curvature,
+                                        Eigen::Vector3d origin)
+{
+  Eigen::Vector4d inter(0, 0, 0, 0);
+  if(mode == 'S')
+  {
+    inter[0] = origin[0] + dist / max_curvature * cos(origin[2]);
+    inter[1] = origin[1] + dist / max_curvature * sin(origin[2]);
+    inter[2] = origin[2];
+  }
+  else
+  {
+    double ldx = sin(dist) / max_curvature;
+    double ldy = 0.0;
+    if(mode == 'L')
+    {
+      ldy = (1.0 - cos(dist)) / max_curvature;
+      inter[2] = origin[2] + dist;
+    }
+    else if(mode == 'R')
+    {
+      ldy = (1.0 - cos(dist)) / -max_curvature;
+      inter[2] = origin[2] - dist;
+    }
+    double gdx = cos(-origin[2]) * ldx + sin(-origin[2]) * ldy;
+    double gdy = -sin(-origin[2]) * ldx + cos(-origin[2]) * ldy;
+    inter[0] = origin[0] + gdx;
+    inter[1] = origin[1] + gdy;
+  }
+  inter[3] = length > 0.0 ? 1 : -1;
+
+  return inter;
+}
 
 } // namespace beacon

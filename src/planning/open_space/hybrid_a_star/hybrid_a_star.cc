@@ -23,6 +23,8 @@ void HybridAStar::Init(point_arr_t points)
   frame_ = std::make_shared<Frame>();
   astar_ = std::make_shared<AStar>();
   astar_result_ = std::make_shared<AstarResult>();
+  rs_path_ = std::make_shared<ReedsSheppPath>();
+
   // std::shared_ptr<beacon::AstarResult> resutlt =
   // std::make_shared<beacon::AstarResult>();
 
@@ -36,8 +38,6 @@ Status HybridAStar::Plan(Eigen::Vector3d start,
                          std::shared_ptr<Frame> frame)
 {
   std::cout << __FUNCTION__ << "   " << __LINE__ << "\n";
-  DEBUG_LOG
-  DEBUG_LOG
   DEBUG_LOG
   DEBUG_LOG
 
@@ -107,7 +107,7 @@ Status HybridAStar::Plan(Eigen::Vector3d start,
       std::make_pair(CalcIndex(tn_start), CalcHybridCost(tn_start)));
 
   // 用来存储 rs 的结点
-  std::shared_ptr<TrajectoryNode> rs_node{};
+  std::shared_ptr<TrajectoryNode> rs_node;
   DEBUG_LOG
   while(true)
   {
@@ -123,6 +123,8 @@ Status HybridAStar::Plan(Eigen::Vector3d start,
 
     bool update = ReedsSheepPath(curr_node, tn_goal, rs_node);
   }
+
+  
 }
 
 void HybridAStar::CalcMotionSet(std::shared_ptr<Frame> frame)
@@ -335,10 +337,48 @@ bool HybridAStar::IsCollision(std::vector<double>& x,
   return false;
 }
 
-bool HybridAStar::ReedsSheepPath(std::shared_ptr<TrajectoryNode> n_curr,
-                                 std::shared_ptr<TrajectoryNode> ngoal,
+bool HybridAStar::ReedsSheepPath(std::shared_ptr<TrajectoryNode> curr,
+                                 std::shared_ptr<TrajectoryNode> goal,
                                  std::shared_ptr<TrajectoryNode>& fpath)
 {
-  
+  DEBUG_LOG
+  ReedsSheppPath rspath = rs_->AnalysticExpantion(curr, goal, frame_);
+  DEBUG_LOG
+
+  if(rspath.x_vec_.empty() || rspath.y_vec_.empty() || rspath.yaw_vec_.empty())
+  {
+    return false;
+  }
+  DEBUG_LOG
+
+  std::vector<double> x_list(rspath.x_vec_.begin() + 1,
+                             rspath.x_vec_.end() - 1);
+  std::vector<double> y_list(rspath.y_vec_.begin() + 1,
+                             rspath.y_vec_.end() - 1);
+  std::vector<double> yaw_list(rspath.yaw_vec_.begin() + 1,
+                               rspath.yaw_vec_.end() - 1);
+  std::vector<int> dir_list(rspath.direc_vec_.begin() + 1,
+                               rspath.direc_vec_.end() - 1);
+  double cost = curr->cost_ + rs_->CalcRspathCost(rspath, frame_);
+  DEBUG_LOG
+
+  int node_idx = CalcIndex(curr);
+  double fsteer = 0.;
+  DEBUG_LOG
+
+  fpath = std::make_shared<TrajectoryNode>(curr->x_coord_,
+                                           curr->y_coord_,
+                                           curr->yaw_,
+                                           curr->direction_,
+                                           x_list,
+                                           y_list,
+                                           yaw_list,
+                                           dir_list,
+                                           fsteer,
+                                           cost,
+                                           node_idx);
+
+  return true;
 }
+
 } // namespace beacon

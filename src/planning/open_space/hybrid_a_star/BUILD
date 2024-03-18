@@ -20,8 +20,11 @@ cc_binary(
     name = "hybrid_a_star_test",
     srcs = [
         "hybrid_a_star_test.cc",
+        "//src/common:matplotlibcpp.h",
     ],
+    copts = ["-I/usr/include/python3.10/"],
     deps = [
         ":hybrid_a_star",
+        "//src/common:matplotlib",
     ],
 )

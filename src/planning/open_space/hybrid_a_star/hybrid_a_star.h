@@ -1,7 +1,8 @@
 #pragma once
 
-#include "../a_star/a_star.h"
+#include "src/planning/open_space/a_star/a_star.h"
 #include "trajectory_node.h"
+#include "reeds_sheep_path.h"
 
 #include "src/common/status.h"
 #include "src/common/frame.h"
@@ -33,8 +34,11 @@ private:
   std::shared_ptr<AStar> astar_;
   std::shared_ptr<Frame> frame_;
   std::shared_ptr<AstarResult> astar_result_;
+  std::shared_ptr<ReedsSheppPath> rs_path_;
+  std::shared_ptr<ReedsShepp> rs_;
 
-  void CalcNextNode();
+  std::shared_ptr<TrajectoryNode> CalcNextNode(
+      std::shared_ptr<TrajectoryNode>& curr_node, int c_id, double u, int d);
 
   int CalcIndex(const std::shared_ptr<TrajectoryNode>& node);
 
@@ -43,6 +47,20 @@ private:
   double CalcHybridCost(const std::shared_ptr<TrajectoryNode>& node);
 
   void CalcParameters(point_arr_t points);
+
+  bool IsIndexOk(int xind,
+                 int yind,
+                 const std::vector<double>& xlist,
+                 const std::vector<double>& ylist,
+                 const std::vector<double>& yawlist);
+
+  bool IsCollision(std::vector<double>& x,
+                   std::vector<double>& y,
+                   std::vector<double>& yaw);
+
+  bool ReedsSheepPath(std::shared_ptr<TrajectoryNode> n_curr,
+                      std::shared_ptr<TrajectoryNode> ngoal,
+                      std::shared_ptr<TrajectoryNode>& fpath);
 
   std::pair<std::vector<double>, std::vector<int>> motion_set_;
 };

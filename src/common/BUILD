@@ -5,11 +5,18 @@ package(default_visibility = ["//visibility:public"])
 cc_library(
     name = "common",
     srcs = [
+        "frame.cc",
         "frame.h",
         "para.h",
         "status.h",
         "utils.h",
         "vehicle_config.h",
+        "//src/common/datastruct:kd_tree.h",
+    ],
+    copts = ["-I/usr/include/python3.10/"],
+    deps = [
+        ":matplotlib",
+        "//src/common/datastruct:kd_tree",
     ],
 )
 

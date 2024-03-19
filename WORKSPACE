@@ -18,6 +18,20 @@ visibility = ["//visibility:public"],
     path = "/usr/lib/python3.10/config-3.10-x86_64-linux-gnu",
 )
 
+new_local_repository(
+    name = "fmt",
+    # 有个很奇怪的问题，如果下面换行了，将会失败
+    build_file_content = """
+cc_library(
+name = "fmt_lib",
+srcs = ["libfmt.so"],
+visibility = ["//visibility:public"],
+)
+""",
+    # Figure out where it is on your system, this is where it is on mine
+    path = "/usr/lib/x86_64-linux-gnu/",
+)
+
 http_archive(
     name = "rules_cc",
     sha256 = "35f2fb4ea0b3e61ad64a369de284e4fbbdcdba71836a5555abb5e194cf119509",

@@ -41,6 +41,7 @@ struct Para
   {}
 
   Para(const Para&) = default;
+  Para() = default;
 
   ~Para() = default;
 };

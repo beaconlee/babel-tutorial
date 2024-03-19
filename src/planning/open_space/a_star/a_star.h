@@ -21,7 +21,7 @@ struct std::hash<Eigen::Vector2d>
   std::size_t operator()(const Eigen::Vector2d& grid) const noexcept
   {
     return std::hash<double>()(grid.x() * grid.x() * grid.x() * grid.x() *
-                               grid.y() * grid.y()*0.987654314324);
+                               grid.y() * grid.y() * 0.987654314324);
   }
 };
 
@@ -57,6 +57,7 @@ class AstarResult
 public:
   std::unordered_map<Eigen::Vector2d, Eigen::Vector2d> came_from{};
   std::unordered_map<Eigen::Vector2d, double> cost_so_far{};
+  std::vector<std::vector<int>> hmap_;
 };
 
 class AStar
@@ -67,7 +68,7 @@ public:
               Eigen::Vector2d goal,
               std::shared_ptr<AstarResult> result);
 
-  Status Plan(const std::shared_ptr<KDTree>& obs,
+  Status Plan(const std::vector<std::vector<double>>& obs,
               Eigen::Vector2d goal,
               std::shared_ptr<AstarResult> result);
 
@@ -80,6 +81,16 @@ private:
   std::vector<Eigen::Vector2d>
   Neighbors(Eigen::Vector2d curr, const std::shared_ptr<KDTree>& obs) const;
 
+  std::vector<Eigen::Vector2d>
+  Neighbors(Eigen::Vector2d curr,
+            const std::vector<std::vector<double>>& obs) const;
+
+  void UpdateAStar(std::vector<std::vector<double>> obs);
+
+  int minx_{1000};
+  int maxx_{-1};
+  int miny_{1000};
+  int maxy_{-1};
   static const std::array<DIRS, 8> motion_set_;
   // 下面这样编译会报错
   // static constexpr std::array<DIRS, 8> motion_set_ = {

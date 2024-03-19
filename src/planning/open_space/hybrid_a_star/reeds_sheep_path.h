@@ -10,7 +10,6 @@
 #include <Eigen/Core>
 namespace beacon
 {
-constexpr double DEFAULT_STRP = 0.1;
 
 class ReedsSheppPath
 {
@@ -63,26 +62,24 @@ public:
   ReedsSheppPath AnalysticExpantion(std::shared_ptr<TrajectoryNode> start,
                                     std::shared_ptr<TrajectoryNode> goal,
                                     std::shared_ptr<Frame>& frame,
-                                    double step_size = DEFAULT_STRP);
+                                    double step_size = MOVE_STEP);
   double CalcRspathCost(ReedsSheppPath rspath, std::shared_ptr<Frame>& frame);
 
-private:
   std::vector<ReedsSheppPath> CalcRSPaths(Eigen::Vector3d start,
                                           Eigen::Vector3d goal,
                                           double macx,
                                           double step_size);
 
-
+private:
   bool IsCollision(std::vector<double>& x,
                    std::vector<double>& y,
                    std::vector<double>& yaw,
                    std::shared_ptr<Frame>& frame);
 
-  std::vector<ReedsSheppPath>
-  GenReedsSheppPath(Eigen::Vector3d start,
-                    Eigen::Vector3d goal,
-                    double maxc,
-                    double step_size = DEFAULT_STRP);
+  std::vector<ReedsSheppPath> GenReedsSheppPath(Eigen::Vector3d start,
+                                                Eigen::Vector3d goal,
+                                                double maxc,
+                                                double step_size = MOVE_STEP);
 
   std::vector<std::vector<double>> SolveRSPath(std::vector<double> lengths,
                                                std::vector<char> modes,
@@ -106,15 +103,45 @@ private:
 };
 
 
+class Path
+{
+public:
+  std::vector<double> lengths;
+  std::vector<char> ctypes;
+  double L;
+  std::vector<double> x;
+  std::vector<double> y;
+  std::vector<double> yaw;
+  std::vector<double> yawt;
+  std::vector<int> directions;
 
-// ReedsSheppPath GenReedsSheppPath(Eigen::Vector3d start,
-//                                  Eigen::Vector3d goal,
-//                                  double maxc,
-//                                  double step_size = DEFAULT_STRP);
+  Path(std::vector<double> _x,
+       std::vector<double> _y,
+       std::vector<double> _yaw,
+       std::vector<int> _dir)
+    : x(_x)
+    , y(_y)
+    , yaw(_yaw)
+    , directions(_dir)
+  {}
+  Path(std::vector<double> _x,
+       std::vector<double> _y,
+       std::vector<double> _yaw,
+       std::vector<double> _yawt,
+       std::vector<int> _dir)
+    : x(_x)
+    , y(_y)
+    , yaw(_yaw)
+    , yawt(_yawt)
+    , directions(_dir)
+  {}
+  Path() {}
+  ~Path() {}
+};
 
-// std::vector<ReedsSheppPath> CalcRSPaths(Eigen::Vector3d start,
-//                                         Eigen::Vector3d goal,
-//                                         double macx,
-//                                         double step_size);
+ReedsSheppPath reeds_shepp_path(Eigen::Vector3d s,
+                                Eigen::Vector3d g,
+                                double maxc,
+                                double step_size = 0.2);
 
 } // namespace beacon

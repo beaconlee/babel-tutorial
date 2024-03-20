@@ -14,7 +14,7 @@ constexpr int N_STEER = 3;      // steer command number
 constexpr double XY_RESO = 1.0; // [m]
 constexpr double YAW_RESO =
     15 * boost::math::constants::pi<double>() / 180; // [rad]
-constexpr double MOVE_STEP = 0.4;          // [m] path interporate resolution
+constexpr double MOVE_STEP = 0.1;          // [m] path interporate resolution
 constexpr double COLLISION_CHECK_STEP = 5; // skip number for collision check
 constexpr double EXTEND_BOUND = 1;         // collision check range extended
 constexpr double GEAR_COST = 100.0;        // switch back penalty cost

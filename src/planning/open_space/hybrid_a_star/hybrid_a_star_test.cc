@@ -5,22 +5,7 @@ namespace plt = matplotlibcpp;
 
 int main()
 {
-  beacon::HybridAStar ha;
-  std::shared_ptr<beacon::Frame> frame = std::make_shared<beacon::Frame>();
-
-
-  beacon::point_arr_t points;
-  for(size_t idx = 1; idx <= 50; ++idx)
-  {
-    points.push_back({static_cast<double>(1), static_cast<double>(idx)});
-    points.push_back({static_cast<double>(50), static_cast<double>(idx)});
-  }
-
-  for(size_t idx = 2; idx <= 50; ++idx)
-  {
-    points.push_back({static_cast<double>(idx), static_cast<double>(1)});
-    points.push_back({static_cast<double>(idx), static_cast<double>(50)});
-  }
+  plt::title("Hybrid A*");
 
   std::vector<std::vector<double>> obs(2);
   for(size_t idx = 0; idx < 50; ++idx)
@@ -53,7 +38,7 @@ int main()
     obs[0].push_back(20);
     obs[1].push_back(idx);
   }
-  for(double idx = 15; idx < 30; idx += 0.5)
+  for(double idx = 15; idx < 29.5; idx += 0.5)
   {
     obs[0].push_back(30);
     obs[1].push_back(idx);
@@ -63,28 +48,21 @@ int main()
     obs[0].push_back(40);
     obs[1].push_back(idx);
   }
-
-  // for(auto point : points)
-  // {
-  //   std::cout << point[0] << point[1] << "\n";
-  // }
-
-  plt::title("Hybrid A*");
-  // for(size_t idx = 1; idx < points.size(); ++idx)
-  // {
-  //   plt::plot(points[idx], points[idx], "sk");
-  // }
   plt::plot(obs[0], obs[1], "sk");
 
+  beacon::HybridAStar ha;
+  std::shared_ptr<beacon::Frame> frame = std::make_shared<beacon::Frame>();
+
+
+  Eigen::Vector3d start{10.0, 7.0, 120 * M_PI / 180};
+  Eigen::Vector3d goal{45.0, 20.0, M_PI_2};
+  std::cout << __FUNCTION__ << "  " << __LINE__ << "\n";
+  std::cout << __FUNCTION__ << "  " << __LINE__ << "\n";
+  ha.Init(obs);
+  std::cout << "enter plan\n";
+  ha.Plan(start, goal, frame);
+
+  
   plt::show();
-
-
-  // Eigen::Vector3d start{1.0, 2.0, 3.0};
-  // Eigen::Vector3d goal{1.0, 2.0, 3.0};
-  // std::cout << __FUNCTION__ << "  " << __LINE__ << "\n";
-  // ha.Init(points);
-  // std::cout << __FUNCTION__ << "  " << __LINE__ << "\n";
-  // std::cout << "enter plan\n";
-  // ha.Plan(start, goal, frame);
   return 0;
 }

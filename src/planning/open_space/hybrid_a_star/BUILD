@@ -14,8 +14,8 @@ cc_library(
     ],
     copts = ["-I/usr/include/python3.10/"],
     deps = [
+        "//src/planning/open_space/a_star:a_star",
         "//src/common:matplotlib",
-        "//src/planning/open_space/a_star",
     ],
 )
 

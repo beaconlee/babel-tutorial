@@ -1,4 +1,4 @@
-#include "reeds_sheep_path.h"
+#include "reeds_shepp.h"
 #include <boost/math/constants/constants.hpp>
 
 using namespace std;
@@ -118,25 +118,17 @@ Vector2d polar(double x, double y)
 inline bool
 LpRmL(double x, double y, double phi, double& t, double& u, double& v)
 {
-  // double xi = x - sin(phi), eta = y - 1. + cos(phi), u1, theta;
-  // Polar(xi, eta, u1, theta);
-  Vector2d ut1 = polar(x - sin(phi), y - 1.0 + cos(phi));
-  if(ut1[0] <= 4.)
+  double xi = x - sin(phi), eta = y - 1. + cos(phi), u1, theta;
+  Polar(xi, eta, u1, theta);
+  if(u1 <= 4.)
   {
-    // u = -2. * asin(.25 * u1);
-    // t = Mod2Pi(theta + .5 * u + pi);
-    // v = Mod2Pi(phi - t + u);
-
-    // return t >= -ZERO && u <= ZERO;
-
-    u = -2.0 * asin(0.25 * ut1[0]);
-    t = Mod2Pi(ut1[1] + 0.5 * u + M_PI);
+    u = -2. * asin(.25 * u1);
+    t = Mod2Pi(theta + .5 * u + pi);
     v = Mod2Pi(phi - t + u);
-
-    if(t >= 0.0 && 0.0 >= u)
-    {
-      return true;
-    }
+    assert(fabs(2 * (sin(t) - sin(t - u)) + sin(phi) - x) < RS_EPS);
+    assert(fabs(2 * (-cos(t) + cos(t - u)) - cos(phi) + 1 - y) < RS_EPS);
+    assert(fabs(Mod2Pi(t - u + v - phi)) < RS_EPS);
+    return t >= -ZERO && u <= ZERO;
   }
   return false;
 }
@@ -665,6 +657,8 @@ std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
   double dth = goal.z() - start.z();
   double c = cos(start.z());
   double s = sin(start.z());
+  // max_curvature = 1 / r
+  // 除以 max_curvatrue 进行归一化
   double x = (c * dx + s * dy) * max_curvature;
   double y = (-s * dx + c * dy) * max_curvature;
 
@@ -673,7 +667,6 @@ std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
   StraightCurveStraight(x, y, dth, paths, step_size);
   CurveStraightCurve(x, y, dth, paths, step_size);
   CurveCurveCurve(x, y, dth, paths, step_size);
-  // curve_curve_curve(x, y, dth, paths, step_size);
   return paths;
 }
 
@@ -902,6 +895,7 @@ std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
   DEBUG_LOG
   // generate_path
   // GenReedsSheppPath
+  // 最大曲率 max curvature
   std::vector<ReedsSheppPath> paths =
       GenReedsSheppPath(start, goal, max_curvature, step_size);
   DEBUG_LOG

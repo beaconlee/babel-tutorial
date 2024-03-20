@@ -657,6 +657,8 @@ std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
   double dth = goal.z() - start.z();
   double c = cos(start.z());
   double s = sin(start.z());
+  // max_curvature = 1 / r
+  // 除以 max_curvatrue 进行归一化
   double x = (c * dx + s * dy) * max_curvature;
   double y = (-s * dx + c * dy) * max_curvature;
 
@@ -665,7 +667,6 @@ std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
   StraightCurveStraight(x, y, dth, paths, step_size);
   CurveStraightCurve(x, y, dth, paths, step_size);
   CurveCurveCurve(x, y, dth, paths, step_size);
-  // curve_curve_curve(x, y, dth, paths, step_size);
   return paths;
 }
 
@@ -894,6 +895,7 @@ std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
   DEBUG_LOG
   // generate_path
   // GenReedsSheppPath
+  // 最大曲率 max curvature
   std::vector<ReedsSheppPath> paths =
       GenReedsSheppPath(start, goal, max_curvature, step_size);
   DEBUG_LOG

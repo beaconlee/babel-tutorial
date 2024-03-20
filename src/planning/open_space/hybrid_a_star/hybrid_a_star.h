@@ -23,19 +23,18 @@ public:
 class HybridAStar
 {
 public:
-  void Init(point_arr_t points);
+  void Init(std::vector<std::vector<double>> obs);
 
   Status Plan(Eigen::Vector3d start,
               Eigen::Vector3d goal,
               std::shared_ptr<Frame> frame);
-
-
 private:
   std::shared_ptr<AStar> astar_;
   std::shared_ptr<Frame> frame_;
   std::shared_ptr<AstarResult> astar_result_;
   std::shared_ptr<ReedsSheppPath> rs_path_;
   std::shared_ptr<ReedsShepp> rs_;
+  std::vector<std::vector<double>> vector_obs_;
 
   std::shared_ptr<TrajectoryNode> CalcNextNode(
       std::shared_ptr<TrajectoryNode>& curr_node, int c_id, double u, int d);

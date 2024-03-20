@@ -8,19 +8,19 @@ namespace beacon
 {
 struct TrajectoryNode
 {
-  int x_coord_;
-  int y_coord_;
-  int yaw_;
-  int direction_;
+  int x_coord_{0};
+  int y_coord_{0};
+  int yaw_{0};
+  int direction_{};
 
-  std::vector<double> x_list_;
-  std::vector<double> y_list_;
-  std::vector<double> yaw_list_;
-  std::vector<int> direction_list_;
+  std::vector<double> x_list_{};
+  std::vector<double> y_list_{};
+  std::vector<double> yaw_list_{};
+  std::vector<int> direction_list_{};
 
-  double steer_;
-  double cost_;
-  int pind_;
+  double steer_{0.};
+  double cost_{0.};
+  int pind_{0};
 
   TrajectoryNode(int x_coord,
                  int y_coord,
@@ -46,8 +46,16 @@ struct TrajectoryNode
     , pind_(pind)
   {}
 
+  TrajectoryNode(int x_coord, int y_coord, int yaw)
+    : x_coord_(x_coord)
+    , y_coord_(y_coord)
+    , yaw_(yaw)
+
+  {}
+
 
   TrajectoryNode() = default;
+  TrajectoryNode(const TrajectoryNode&) = default;
   ~TrajectoryNode() = default;
 };
 } // namespace beacon

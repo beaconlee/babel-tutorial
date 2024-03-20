@@ -11,6 +11,9 @@ cc_library(
         "utils.h",
         "vehicle_config.h",
     ],
+    deps = [
+        "//src/common/datastruct:kd_tree",
+    ],
 )
 
 cc_library(

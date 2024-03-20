@@ -10,9 +10,11 @@ cc_library(
         "trajectory_node.cc",
         "trajectory_node.h",
     ],
-    copts = ["-fPIC"],  # Add -fPIC option here
+    copts = ["-I/usr/include/python3.10/"],
     deps = [
-        "//src/planning/open_space/a_star:a_star",
+        "//src/common:common",
+        "//src/common:matplotlib",
+        "//src/planning/open_space/a_star",
     ],
 )
 

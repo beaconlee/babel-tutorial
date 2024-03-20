@@ -106,22 +106,37 @@ LpSpRp(double x, double y, double phi, double& t, double& u, double& v)
   }
   return false;
 }
+Vector2d polar(double x, double y)
+{
+  double r = hypot(x, y);
+  double theta = atan2(y, x);
+
+  return {r, theta};
+}
 
 // formula 8.3 / 8.4  *** TYPO IN PAPER ***
 inline bool
 LpRmL(double x, double y, double phi, double& t, double& u, double& v)
 {
-  double xi = x - sin(phi), eta = y - 1. + cos(phi), u1, theta;
-  Polar(xi, eta, u1, theta);
-  if(u1 <= 4.)
+  // double xi = x - sin(phi), eta = y - 1. + cos(phi), u1, theta;
+  // Polar(xi, eta, u1, theta);
+  Vector2d ut1 = polar(x - sin(phi), y - 1.0 + cos(phi));
+  if(ut1[0] <= 4.)
   {
-    u = -2. * asin(.25 * u1);
-    t = Mod2Pi(theta + .5 * u + pi);
+    // u = -2. * asin(.25 * u1);
+    // t = Mod2Pi(theta + .5 * u + pi);
+    // v = Mod2Pi(phi - t + u);
+
+    // return t >= -ZERO && u <= ZERO;
+
+    u = -2.0 * asin(0.25 * ut1[0]);
+    t = Mod2Pi(ut1[1] + 0.5 * u + M_PI);
     v = Mod2Pi(phi - t + u);
-    assert(fabs(2 * (sin(t) - sin(t - u)) + sin(phi) - x) < RS_EPS);
-    assert(fabs(2 * (-cos(t) + cos(t - u)) - cos(phi) + 1 - y) < RS_EPS);
-    assert(fabs(Mod2Pi(t - u + v - phi)) < RS_EPS);
-    return t >= -ZERO && u <= ZERO;
+
+    if(t >= 0.0 && 0.0 >= u)
+    {
+      return true;
+    }
   }
   return false;
 }
@@ -169,7 +184,7 @@ void StraightCurveStraight(double x,
   {
     SetPath(paths, t, u, v, {'S', 'L', 'S'}, step_size);
   }
-  if(SpLpSp(-x, y, -phi, t, u, v)) // timeflip
+  if(SpLpSp(x, -y, -phi, t, u, v)) // timeflip
   {
     SetPath(paths, -t, -u, -v, {'S', 'R', 'S'}, step_size);
   }
@@ -215,6 +230,36 @@ void CurveStraightCurve(double x,
     SetPath(paths, -t, -u, -v, {'R', 'S', 'L'}, step_size);
 }
 
+
+void set_path(vector<beacon::ReedsSheppPath>& paths,
+              Eigen::Vector3d lengths,
+              vector<char> ctypes,
+              double step_size)
+{
+  beacon::ReedsSheppPath path;
+  path.char_ = ctypes;
+  path.lengths_ = {lengths[0], lengths[1], lengths[2]};
+  path.l_ = abs(lengths[0]) + abs(lengths[1]) + abs(lengths[2]);
+
+  for(beacon::ReedsSheppPath i_path : paths)
+  {
+    bool type_is_same = (i_path.char_ == path.char_);
+    bool length_is_close = ((i_path.l_ - path.l_) <= step_size);
+    if(type_is_same && length_is_close)
+    {
+      return;
+    }
+  }
+
+  if(path.l_ <= step_size)
+  {
+    return;
+  }
+
+  paths.push_back(path);
+}
+
+
 void CurveCurveCurve(double x,
                      double y,
                      double phi,
@@ -226,14 +271,17 @@ void CurveCurveCurve(double x,
   {
     SetPath(paths, t, u, v, {'L', 'R', 'L'}, step_size);
   }
+
   if(LpRmL(-x, y, -phi, t, u, v)) // timeflip
   {
     SetPath(paths, -t, -u, -v, {'L', 'R', 'L'}, step_size);
   }
+
   if(LpRmL(x, -y, -phi, t, u, v)) // reflect
   {
     SetPath(paths, t, u, v, {'R', 'L', 'R'}, step_size);
   }
+
   if(LpRmL(-x, -y, phi, t, u, v)) // timeflip + reflect
   {
     SetPath(paths, -t, -u, -v, {'R', 'L', 'R'}, step_size);
@@ -244,19 +292,22 @@ void CurveCurveCurve(double x,
   double yb = x * sin(phi) - y * cos(phi);
   if(LpRmL(xb, yb, phi, t, u, v))
   {
-    SetPath(paths, t, u, v, {'L', 'R', 'L'}, step_size);
+    SetPath(paths, v, u, t, {'L', 'R', 'L'}, step_size);
   }
+
   if(LpRmL(-xb, yb, -phi, t, u, v)) // timeflip
   {
-    SetPath(paths, -t, -u, -v, {'L', 'R', 'L'}, step_size);
+    SetPath(paths, -v, -u, -t, {'L', 'R', 'L'}, step_size);
   }
+
   if(LpRmL(xb, -yb, -phi, t, u, v)) // reflect
   {
-    SetPath(paths, t, u, v, {'R', 'L', 'R'}, step_size);
+    SetPath(paths, v, u, t, {'R', 'L', 'R'}, step_size);
   }
+
   if(LpRmL(-xb, -yb, phi, t, u, v)) // timeflip + reflect
   {
-    SetPath(paths, -t, -u, -v, {'R', 'L', 'R'}, step_size);
+    SetPath(paths, -v, -u, -t, {'R', 'L', 'R'}, step_size);
   }
 }
 
@@ -403,7 +454,13 @@ Vector3d left_straight_right(double x, double y, double phi, bool& flag)
 Vector3d left_right_left(double x, double y, double phi, bool& flag)
 {
   flag = false;
+  // double r = hypot(x, y);
+  // double theta = atan2(y, x);
+
+  // return {r, theta};
   Vector2d ut1 = polar(x - sin(phi), y - 1.0 + cos(phi));
+  // ut1[0] r     t
+  // ut1[1] theta v
 
   if(ut1[0] <= 4.0)
   {
@@ -419,33 +476,6 @@ Vector3d left_right_left(double x, double y, double phi, bool& flag)
   }
 
   return {0.0, 0.0, 0.0};
-}
-void set_path(vector<ReedsSheppPath>& paths,
-              Eigen::Vector3d lengths,
-              vector<char> ctypes,
-              double step_size)
-{
-  ReedsSheppPath path;
-  path.char_ = ctypes;
-  path.lengths_ = {lengths[0], lengths[1], lengths[2]};
-  path.l_ = abs(lengths[0]) + abs(lengths[1]) + abs(lengths[2]);
-
-  for(ReedsSheppPath i_path : paths)
-  {
-    bool type_is_same = (i_path.char_ == path.char_);
-    bool length_is_close = ((i_path.l_ - path.l_) <= step_size);
-    if(type_is_same && length_is_close)
-    {
-      return;
-    }
-  }
-
-  if(path.l_ <= step_size)
-  {
-    return;
-  }
-
-  paths.push_back(path);
 }
 
 
@@ -540,24 +570,31 @@ void curve_curve_curve(double x,
   Eigen::Vector3d tuv = left_right_left(x, y, phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, tuv, {'L', 'R', 'L'}, step_size);
   }
 
   tuv = left_right_left(-x, y, -phi, flag);
   if(flag)
   {
+    DEBUG_LOG
     set_path(paths, -1 * tuv, {'L', 'R', 'L'}, step_size);
   }
 
   tuv = left_right_left(x, -y, -phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, tuv, {'R', 'L', 'R'}, step_size);
   }
 
   tuv = left_right_left(-x, -y, phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, -1 * tuv, {'R', 'L', 'R'}, step_size);
   }
 
@@ -567,27 +604,35 @@ void curve_curve_curve(double x,
   tuv = left_right_left(xb, yb, phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, {tuv[2], tuv[1], tuv[0]}, {'L', 'R', 'L'}, step_size);
   }
 
   tuv = left_right_left(-xb, yb, -phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, {-tuv[2], -tuv[1], -tuv[0]}, {'L', 'R', 'L'}, step_size);
   }
 
   tuv = left_right_left(xb, -yb, -phi, flag);
   if(flag)
   {
+    DEBUG_LOG
     set_path(paths, {tuv[2], tuv[1], tuv[0]}, {'R', 'L', 'R'}, step_size);
   }
 
   tuv = left_right_left(-xb, -yb, phi, flag);
   if(flag)
   {
+    DEBUG_LOG
+    ///////////////
     set_path(paths, {-tuv[2], -tuv[1], -tuv[0]}, {'R', 'L', 'R'}, step_size);
   }
 }
+
 vector<ReedsSheppPath> generate_path(Eigen::Vector3d start,
                                      Eigen::Vector3d goal,
                                      double max_curvature,
@@ -606,8 +651,6 @@ vector<ReedsSheppPath> generate_path(Eigen::Vector3d start,
   curve_straight_curve(x, y, dth, paths, step_size);
   curve_curve_curve(x, y, dth, paths, step_size);
 
-
-  std::cout << "\n";
   return paths;
 }
 
@@ -624,15 +667,13 @@ std::vector<ReedsSheppPath> ReedsShepp::GenReedsSheppPath(Eigen::Vector3d start,
   double s = sin(start.z());
   double x = (c * dx + s * dy) * max_curvature;
   double y = (-s * dx + c * dy) * max_curvature;
-  DEBUG_LOG
 
   std::vector<ReedsSheppPath> paths;
 
   StraightCurveStraight(x, y, dth, paths, step_size);
   CurveStraightCurve(x, y, dth, paths, step_size);
   CurveCurveCurve(x, y, dth, paths, step_size);
-  DEBUG_LOG
-
+  // curve_curve_curve(x, y, dth, paths, step_size);
   return paths;
 }
 

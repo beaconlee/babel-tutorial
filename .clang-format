@@ -196,12 +196,12 @@ EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: LogicalBlock
 # 实验性的自动检测同行并进行操作， 建议false
 ExperimentalAutoDetectBinPacking: false
-# 是否打包构造函数初始化列表, 建议Never, 可选:
+# 是否打包构造函数初始化列表, 建议Never, 可选: 控制初始化列表是否在同一行
 # - Never: 永远不做操作, 即一个参数一行
 # - BinPack: 两个参数一行
 # - CurrentLine: 所有参数放置于一行, 如果放不下, 就一个参数一行
 # - NextLine: 同CurrentLine有点像, 唯一不同就是如果放不行, 将剩余参数放置于下一行(即不自动一参一行)
-PackConstructorInitializers: Never
+PackConstructorInitializers: CurrentLine
 BasedOnStyle: LLVM
 # 废弃配置
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
@@ -270,9 +270,6 @@ IndentWrappedFunctionNames: false
 InsertBraces:    false
 # 是否强制插入拖尾的',', 建议为None
 InsertTrailingCommas: None
-# Java相关, 跳过
-JavaScriptQuotes: Leave
-JavaScriptWrapImports: true
 # 是否block开始前有一个empty line, 诡异, 直接false
 KeepEmptyLinesAtTheStartOfBlocks: false
 # 未找到定义
@@ -282,7 +279,7 @@ MacroBlockBegin: ''
 # 宏结束的正则, 不使用
 MacroBlockEnd: ''
 # 空行保持, 建议为1
-MaxEmptyLinesToKeep: 3
+MaxEmptyLinesToKeep: 2
 # Namespace内的对齐, 直接使用None即可, 即所有namespace内(包括内嵌的)都不indent
 NamespaceIndentation: None
 # Obj-C语言设置, 跳过

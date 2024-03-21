@@ -342,7 +342,6 @@ ReedsShepp::AnalysticExpantion(std::shared_ptr<TrajectoryNode> start,
       [&frame, this](const ReedsSheppPath& path_a, const ReedsSheppPath& path_b)
       {
         DEBUG_LOG
-
         return CalcRspathCost(path_a, frame) < CalcRspathCost(path_b, frame);
       });
   DEBUG_LOG
@@ -767,6 +766,8 @@ ReedsShepp::SolveRSPath(std::vector<double> lengths,
                         double max_curvature,
                         double step_size)
 {
+  // lengths 就是 t u v
+  // 将 lengths 分解为 step_size 大小
   std::vector<std::vector<double>> interpolate_dists_list =
       CalcInterpolateDistsList(lengths, step_size);
 
@@ -776,6 +777,7 @@ ReedsShepp::SolveRSPath(std::vector<double> lengths,
   std::vector<double> yaws;
   std::vector<double> directions;
 
+  // modes 表示当前是什么方向的， 'S' 'L' 'R'  直行还是 左转 右转
   for(size_t idx = 0; idx < lengths.size(); ++idx)
   {
     for(double dist : interpolate_dists_list[idx])
@@ -787,6 +789,7 @@ ReedsShepp::SolveRSPath(std::vector<double> lengths,
       yaws.push_back(state[2]);
       directions.push_back(state[3]);
     }
+    // 更新 rs 曲线不同的阶段
     origin[0] = xs.back();
     origin[1] = ys.back();
     origin[2] = yaws.back();
@@ -797,6 +800,7 @@ ReedsShepp::SolveRSPath(std::vector<double> lengths,
 
 
 
+// 将 lengths 分解为 step_size 大小
 std::vector<std::vector<double>>
 ReedsShepp::CalcInterpolateDistsList(std::vector<double> lengths,
                                      double step_size)
@@ -827,13 +831,19 @@ Eigen::Vector4d ReedsShepp::Interpolate(double dist,
   Eigen::Vector4d inter(0, 0, 0, 0);
   if(mode == 'S')
   {
+    // 反解析直行的 坐标
     inter[0] = origin[0] + dist / max_curvature * cos(origin[2]);
     inter[1] = origin[1] + dist / max_curvature * sin(origin[2]);
     inter[2] = origin[2];
   }
   else
   {
+    // 反解析曲线的坐标
+    // dist 就是当前在单位圆下行走的弧度
+    // sin(dist) 表示在单位圆下行走的横坐标
+    // / max_curvature 表示将当前坐标映射为真实的坐标
     double ldx = sin(dist) / max_curvature;
+    // ldy 算法不同，根据左转右转进行区分
     double ldy = 0.0;
     if(mode == 'L')
     {
@@ -845,11 +855,22 @@ Eigen::Vector4d ReedsShepp::Interpolate(double dist,
       ldy = (1.0 - cos(dist)) / -max_curvature;
       inter[2] = origin[2] - dist;
     }
+    
+    // 当前的坐标是经过旋转后得到的，需要将其反解为正常的
+    //! 这里并不是将其反解为 全局 正常的
+    //! 只是反解我们在计算时的默认以坐标原点为起始点的情况
+    //! 这里反解析使用的是  origin[2] 全局进行归一化时 使用的是 start[2]
+
+    //!!!!!! 忽略了一个很重要的点
+    // 我们这里的计算方式都是基于起始点在坐标原点的情况，
+    // 也就是说我们将当前点旋转到了坐标原点，在这里，我们只是将点旋转到了他真实的方向
     double gdx = cos(-origin[2]) * ldx + sin(-origin[2]) * ldy;
     double gdy = -sin(-origin[2]) * ldx + cos(-origin[2]) * ldy;
+    // 得到最终的坐标
     inter[0] = origin[0] + gdx;
     inter[1] = origin[1] + gdy;
   }
+  // 前进还是后退
   inter[3] = length > 0.0 ? 1 : -1;
 
   return inter;
@@ -902,6 +923,9 @@ std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
 
   for(ReedsSheppPath& path : paths)
   {
+    // 反归一化，
+    // path.lengths_ 是一个 std::vector, 存放的就是 t u v
+    // 返回的 status 就是当前 rs 曲线反解出来的真实的坐标
     std::vector<std::vector<double>> status =
         SolveRSPath(path.lengths_, path.char_, max_curvature, step_size);
     DEBUG_LOG
@@ -913,7 +937,11 @@ std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
       double yaw = status[2][idx];
 
       int direction = static_cast<int>(status[3][idx]);
+      
+      // 但是这里还是要进行一次 反解析？
 
+      // 这里是进行全局反解析
+      // 这里使用的是 start[0] 的角度，进行全局标准化时使用的也是 start[0]
       path.x_vec_.emplace_back(std::cos(-start[2]) * ix +
                                std::sin(-start[2]) * iy + start[0]);
       path.y_vec_.emplace_back(-std::sin(-start[2]) * ix +
@@ -930,6 +958,7 @@ std::vector<ReedsSheppPath> ReedsShepp::CalcRSPaths(Eigen::Vector3d start,
   }
   DEBUG_LOG
 
+  // 最终返回在正常坐标系下的路径点
   return paths;
 }
 

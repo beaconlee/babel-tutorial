@@ -37,8 +37,10 @@ CubicSpline::CubicSpline(vector<double> _x, vector<double> _y)
   y = _y;
   nx = x.size();
   h = diff(x);
+  // 判断所有的h是否都有效
   bool not_valid =
       std::any_of(h.begin(), h.end(), [](double val) { return val < 0; });
+
   if(not_valid)
   {
     throw std::invalid_argument(
@@ -63,16 +65,36 @@ CubicSpline::CubicSpline(vector<double> _x, vector<double> _y)
 
 MatrixXd CubicSpline::calc_A(void)
 {
+  // 根据 x 的大小初始化一个方阵
+  // 矩阵 A：矩阵 A 是一个 nx × nx 的对称三对角矩阵，其中 nx 是插值节点的数量。矩阵 A 的主对角线和两条相邻的对角线上的元素用于表示插值函数的二阶导数，而其他元素都为零。具体地，对于内部节点 i，矩阵 A 的对角线元素为 2*(h[i-1]+h[i])，其中 h[i] 表示节点 i 的步长（即相邻节点间的距离）。矩阵 A 的相邻对角线元素为 h[i-1]，表示相邻节点之间的关系。首尾节点处，由于缺少相邻节点，对应的元素为特殊值。
   MatrixXd A = MatrixXd::Zero(nx, nx);
   A(0, 0) = 1.0;
 
+
+  /*
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  
+  */
   for(size_t idx = 0; idx < (nx - 1); ++idx)
   {
     if(idx != nx - 2)
     {
+      // 这里赋值的是对角线上的点
       A(idx + 1, idx + 1) = 2.0 * (h[idx] + h[idx + 1]);
     }
+    // 这里赋值的是对角线下面的点
     A(idx + 1, idx) = h[idx];
+    // 这里赋值的是对角线上面的点
     A(idx, idx + 1) = h[idx];
   }
   A(0, 1) = 0.0;

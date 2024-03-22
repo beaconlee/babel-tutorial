@@ -18,24 +18,38 @@ namespace beacon
 {
 
 // Parameter
-constexpr double MAX_SPEED = 50.0 / 3.6;   //maximum speed [m/s]
-constexpr double MAX_ACCEL = 2.0;          //maximum acceleration [m/ss]
-constexpr double MAX_CURVATURE = 1.0;      //maximum curvature [1/m]
-constexpr double MAX_ROAD_WIDTH = 7.0;     //maximum road width [m]
-constexpr double D_ROAD_W = 1.0;           //road width sampling length [m]
-constexpr double DT = 0.2;                 //time tick [s]
-constexpr double MAX_T = 5.0;              //max prediction time [m]
-constexpr double MIN_T = 4.0;              //min prediction time [m]
-constexpr double TARGET_SPEED = 30. / 3.6; //target speed [m/s]
-constexpr double D_T_S = 5.0 / 3.6;        //target speed sampling length [m/s]
-constexpr double N_S_SAMPLE = 1;           //sampling number of target speed
-constexpr double ROBOT_RADIUS = 2.0;       //robot radius [m]
+constexpr double MAX_SPEED = 50.0 / 3.6; //maximum speed [m/s]
+constexpr double MAX_ACCEL = 2.0;        //maximum acceleration [m/ss]
+constexpr double MAX_CURVATURE = 1.0;    //maximum curvature [1/m]
+constexpr double MAX_ROAD_WIDTH = 7.0;   //maximum road width [m]
+constexpr double D_ROAD_W =
+    1.0; //road width sampling length [m]  道路宽度采样长度
+constexpr double DT =
+    0.2; //time tick [s]  间刻度，用于离散化时间，在规划过程中表示每次规划的时间间隔，以秒（s）为单位。
+constexpr double MAX_T = 5.0; //max prediction time [m]  最长预测时间
+constexpr double MIN_T = 4.0; //min prediction time [m]  最短预测时间
+constexpr double TARGET_SPEED =
+    30. / 3.6; //target speed [m/s]  表示车辆在规划路径上的目标速度，
+
+/*
+`D_T_S`是目标速度的采样长度，用于路径规划中对目标速度进行离散化处理。
+在路径规划中，通常会考虑一系列可能的目标速度，而不是只考虑一个固定的目标速度。
+通过将目标速度离散化为一系列候选速度，可以更全面地考虑不同速度下的路径规划情况，以选择最优的路径。
+具体来说，`D_T_S`定义了目标速度的采样间隔，即每次采样时增加或减少的速度值。通过将目标速度范围划分为多个小区间，可以在这些区间中进行速度采样，以便评估每个速度下的路径成本，并选择最优的速度和路径组合。
+在代码中，`D_T_S`的值为`5.0 / 3.6`，表示每次采样时增加或减少`5.0`米每秒（m/s），即`5.0 / 3.6`米每秒平方（m/s²）。
+*/
+constexpr double D_T_S =
+    5.0 /
+    3.6; //target speed sampling length [m/s]   目标速度采样长度  目标速度采样长度，用于在规划过程中对目标速度进行采样，
+constexpr double N_S_SAMPLE =
+    1; //sampling number of target speed      目标速度采样数  目标速度采样数，表示规划过程中对目标速度进行采样的数量
+constexpr double ROBOT_RADIUS = 2.0; //robot radius [m]
 // cost weights
-constexpr double K_J = 0.1;
-constexpr double K_T = 0.1;
-constexpr double K_D = 1.0;
-constexpr double K_LAT = 1.0;
-constexpr double K_LON = 1.0;
+constexpr double K_J = 0.1;   // 横向加速度变化的成本权重
+constexpr double K_T = 0.1;   // 横向转向的成本权重
+constexpr double K_D = 1.0;   // 纵向距离的成本权重
+constexpr double K_LAT = 1.0; // 横向位置的成本权重
+constexpr double K_LON = 1.0; // 纵向位置的成本权重
 
 
 class FrenetPath
@@ -79,11 +93,23 @@ vector<FrenetPath> calc_frenet_paths(double c_speed,
 
   for(double di = -MAX_ROAD_WIDTH; di < MAX_ROAD_WIDTH; di += D_ROAD_W)
   {
+    // 最短行驶时间
     for(double Ti = MIN_T; Ti < MAX_T; Ti += DT)
     {
       FrenetPath fp;
+      /*
+        QuinticPolynomial(double xs,   // 起始位置
+                    double vxs,  // 起始位置速度
+                    double axs,  // 起始位置加速度
+                    double xe,   // 终点位置
+                    double vxe,  // 终点位置速度
+                    double axe,  // 终点位置加速度
+                    double time) // 时间  time = t1 - t0
+      */
+      // xs vxs  axs xe vxe axe time
+      // 起始位置 起始速度 起始加速度 终点位置 终点速度 终点加速度 时间
       QuinticPolynomial lat_qp(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti);
-
+      
       for(double t = 0.; t < Ti; t += DT)
       {
         fp.t.push_back(t);
@@ -229,6 +255,8 @@ FrenetPath frenet_optimal_planning(CubicSpline2D& csp,
 {
   vector<FrenetPath> fplist =
       calc_frenet_paths(c_speed, c_accel, c_d, c_d_d, c_d_dd, s0);
+
+
   calc_global_paths(fplist, csp);
   vector<FrenetPath> final_paths = check_paths(fplist, obs);
 
@@ -246,4 +274,71 @@ FrenetPath frenet_optimal_planning(CubicSpline2D& csp,
   return best_path;
 }
 
+
 } // namespace beacon
+
+int main(int argc, char** argv)
+{
+  vector<double> wx = {0.0, 10.0, 20.5, 35.0, 70.5};
+  vector<double> wy = {0.0, -6.0, 5.0, 6.5, 0.0};
+  vector<vector<double>> obs = {{20., 30., 30., 35., 50.},
+                                {10., 6., 8., 8., 3.}};
+  vector<vector<double>> spline =
+      CubicSpline2D::calc_spline_course(wx, wy, 0.1);
+  CubicSpline2D csp = CubicSpline2D(wx, wy);
+
+  double c_speed = 10.0 / 3.6;
+  double c_accel = 0.0;
+  double c_d = 2.0;
+  double c_d_d = 0.0;
+  double c_d_dd = 0.0;
+  double s0 = 0.0;
+  double area = 20.0;
+  VehicleConfig vc(0.9);
+  size_t iter = 0;
+  while(iter++ < SIM_LOOP)
+  {
+    FrenetPath path = frenet_optimal_planning(
+        csp, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, obs);
+
+    s0 = path.s[1];
+    c_d = path.d[1];
+    c_d_d = path.d_d[1];
+    c_d_dd = path.d_dd[1];
+    c_speed = path.s_d[1];
+    c_accel = path.s_dd[1];
+
+    if(hypot(path.x[1] - spline[0].back(), path.y[1] - spline[1].back()) <= 1.)
+    {
+      break;
+    }
+    if(show_animation)
+    {
+      plt::cla();
+      plt::named_plot("The planned spline path", spline[0], spline[1]);
+      plt::plot(obs[0], obs[1], "xk");
+      plt::named_plot("The optimal trajectory", path.x, path.y, "-r");
+      // The steer here is not strictly calculated by vehicle kinematics,
+      // but is only visualized based on curvature scaling.
+      utils::draw_vehicle({path.x[0], path.y[0], path.yaw[0]},
+                          utils::pi_2_pi(5 * path.c[0]),
+                          vc);
+
+      plt::xlim(path.x[1] - area, path.x[1] + area);
+      plt::ylim(path.y[1] - area, path.y[1] + area);
+      plt::title("Frenet Optimal Trajectory V[km/h]:" +
+                 std::to_string(c_speed * 3.6).substr(0, 4));
+      plt::legend({{"loc", "upper left"}});
+      plt::grid(true);
+      plt::pause(0.0001);
+    }
+  }
+
+  if(show_animation)
+  {
+    plt::grid(true);
+    plt::show();
+  }
+
+  return 0;
+}

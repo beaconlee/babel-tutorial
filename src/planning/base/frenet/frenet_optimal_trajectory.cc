@@ -6,7 +6,6 @@
 #include <Eigen/Core>
 #include <fmt/core.h>
 
-#include "src/planning/base/frenet/cubic_spline.h"
 #include "cubic_spline.h"
 #include "quintic_polynomial.h"
 #include "quartic_polynomial.h"
@@ -99,17 +98,20 @@ vector<FrenetPath> calc_frenet_paths(double c_speed,
       FrenetPath fp;
       /*
         QuinticPolynomial(double xs,   // 起始位置
-                    double vxs,  // 起始位置速度
-                    double axs,  // 起始位置加速度
-                    double xe,   // 终点位置
-                    double vxe,  // 终点位置速度
-                    double axe,  // 终点位置加速度
-                    double time) // 时间  time = t1 - t0
+                          double vxs,  // 起始位置速度
+                          double axs,  // 起始位置加速度
+                          double xe,   // 终点位置
+                          double vxe,  // 终点位置速度
+                          double axe,  // 终点位置加速度
+                          double time) // 时间  time = t1 - t0
       */
       // xs vxs  axs xe vxe axe time
       // 起始位置 起始速度 起始加速度 终点位置 终点速度 终点加速度 时间
+      // 计算横向
       QuinticPolynomial lat_qp(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti);
-      
+
+      // constexpr double DT = 0.2; time tick [s]  
+      // 时间刻度，用于离散化时间，在规划过程中表示每次规划的时间间隔，以秒（s）为单位。
       for(double t = 0.; t < Ti; t += DT)
       {
         fp.t.push_back(t);
@@ -124,6 +126,11 @@ vector<FrenetPath> calc_frenet_paths(double c_speed,
           tv += D_T_S)
       {
         FrenetPath tfp = fp;
+        /*
+        四次多项式只规划结束位置的速度
+        QuarticPolynomial(
+        double xs, double vxs, double axs, double vxe, double axe, double time)
+        */
         QuarticPolynomial lon_qp(s0, c_speed, c_accel, tv, 0.0, Ti);
 
         for(double t : fp.t)
@@ -244,6 +251,18 @@ vector<FrenetPath> check_paths(vector<FrenetPath>& fplist,
   return final_fp;
 }
 
+
+/*
+  double c_speed = 10.0 / 3.6; // 开始 速度
+  double c_accel = 0.0;        // 开始加速度
+  double c_d = 2.0;            //
+  double c_d_d = 0.0;
+  double c_d_dd = 0.0;
+  double s0 = 0.0;
+  double area = 20.0;
+  FrenetPath path = frenet_optimal_planning(
+      csp, s0, c_speed, c_accel, c_d, c_d_d, c_d_dd, obs);
+*/
 FrenetPath frenet_optimal_planning(CubicSpline2D& csp,
                                    double s0,
                                    double c_speed,
@@ -283,15 +302,28 @@ int main(int argc, char** argv)
   vector<double> wy = {0.0, -6.0, 5.0, 6.5, 0.0};
   vector<vector<double>> obs = {{20., 30., 30., 35., 50.},
                                 {10., 6., 8., 8., 3.}};
+  // 通过点坐标计算 样条曲线
+  /*
+  根据 ds(0.1) 算出 每个 s 对应的 xy 坐标
+  */
   vector<vector<double>> spline =
       CubicSpline2D::calc_spline_course(wx, wy, 0.1);
+  /*
+  // s 就相当于 sl 坐标系中的 s
+  // 表示 s 方向的距离
+  s = calc_s(_x, _y);
+  //
+  sx = CubicSpline(s, _x);
+  sy = CubicSpline(s, _y);
+  存储了 x、y 与 s 的对应关系
+  */
   CubicSpline2D csp = CubicSpline2D(wx, wy);
 
-  double c_speed = 10.0 / 3.6;
-  double c_accel = 0.0;
-  double c_d = 2.0;
-  double c_d_d = 0.0;
-  double c_d_dd = 0.0;
+  double c_speed = 10.0 / 3.6; // 开始 纵向速度
+  double c_accel = 0.0;        // 开始 纵向加速度
+  double c_d = 2.0;            // 开始 横向位置
+  double c_d_d = 0.0;          // 开始 横向加速度
+  double c_d_dd = 0.0;         // 开始 横向加加速度
   double s0 = 0.0;
   double area = 20.0;
   VehicleConfig vc(0.9);

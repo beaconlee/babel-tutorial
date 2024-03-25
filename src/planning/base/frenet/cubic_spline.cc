@@ -37,8 +37,10 @@ CubicSpline::CubicSpline(vector<double> _x, vector<double> _y)
   y = _y;
   nx = x.size();
   h = diff(x);
+  // 判断所有的h是否都有效
   bool not_valid =
       std::any_of(h.begin(), h.end(), [](double val) { return val < 0; });
+
   if(not_valid)
   {
     throw std::invalid_argument(
@@ -49,6 +51,7 @@ CubicSpline::CubicSpline(vector<double> _x, vector<double> _y)
   VectorXd B = calc_B();
   VectorXd c_eigen = A.colPivHouseholderQr().solve(B);
   double* c_pointer = c_eigen.data();
+  // 在 C++ 中，std::vector 的 assign 函数用于将新元素赋值给向量，替换其当前内容。assign 函数有多个重载形式，可以接受不同类型的参数，以及不同的范围来指定要分配给向量的值。
   c.assign(c_pointer, c_pointer + c_eigen.rows());
 
   for(size_t idx = 0; idx < (nx - 1); ++idx)
@@ -63,18 +66,42 @@ CubicSpline::CubicSpline(vector<double> _x, vector<double> _y)
 
 MatrixXd CubicSpline::calc_A(void)
 {
+  // 根据 x 的大小初始化一个方阵
+  // 矩阵 A：矩阵 A 是一个 nx × nx 的对称三对角矩阵，其中 nx 是插值节点的数量。矩阵 A 的主对角线和两条相邻的对角线上的元素用于表示插值函数的二阶导数，而其他元素都为零。具体地，对于内部节点 i，矩阵 A 的对角线元素为 2*(h[i-1]+h[i])，其中 h[i] 表示节点 i 的步长（即相邻节点间的距离）。矩阵 A 的相邻对角线元素为 h[i-1]，表示相邻节点之间的关系。首尾节点处，由于缺少相邻节点，对应的元素为特殊值。
   MatrixXd A = MatrixXd::Zero(nx, nx);
   A(0, 0) = 1.0;
 
+
+  /*
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  1  1  1  1  1  1  1  1  1  1  1  1
+  */
   for(size_t idx = 0; idx < (nx - 1); ++idx)
   {
     if(idx != nx - 2)
     {
+      // 这里赋值的是对角线上的点
+      // 从 第二行 赋值到 倒数第二行
+      // 因为根据四个条件只能确定 4n-2 个方程
+      // 还有两个方程有边界条件确定
       A(idx + 1, idx + 1) = 2.0 * (h[idx] + h[idx + 1]);
     }
+    // 这里赋值的是 上面对角点 左边的点
     A(idx + 1, idx) = h[idx];
+    // 这里赋值的是 上面对角点 左边的点
     A(idx, idx + 1) = h[idx];
   }
+  // 这里确定最后两个方程，使用一些边界条件
+  // 使用  自由边界(Natural)
   A(0, 1) = 0.0;
   A(nx - 1, nx - 2) = 0.0;
   A(nx - 1, nx - 1) = 1.0;
@@ -167,10 +194,13 @@ double CubicSpline::operator()(double _x, int dd) const
 
 CubicSpline2D::CubicSpline2D(vector<double> _x, vector<double> _y)
 {
+  // s 就相当于 sl 坐标系中的 s
+  // 表示 s 方向的距离
   s = calc_s(_x, _y);
+  //
   sx = CubicSpline(s, _x);
   sy = CubicSpline(s, _y);
-}
+} 
 
 vector<double> CubicSpline2D::calc_s(vector<double> _x, vector<double> _y)
 {
@@ -178,16 +208,22 @@ vector<double> CubicSpline2D::calc_s(vector<double> _x, vector<double> _y)
   vector<double> dy = diff(_y);
   vector<double> ds;
   vector<double> s = {0};
+  // 计算两点之间的欧几里得距离 欧氏距离（Euclidean Distance）
   for(size_t idx = 0; idx < dx.size(); ++idx)
   {
     ds.push_back(hypot(dx[idx], dy[idx]));
   }
+  // ds 中之前存放的是两点之间间隔的距离
+  // 现在将 ds 中的距离进行累加
   vector<double> cum = cumsum(ds);
   s.insert(s.end(), cum.begin(), cum.end());
 
   return s;
 }
 
+// 这样设计的好处是：可以简化计算
+// 只需要输入预估目标距离当前点的距离就可以计算出坐标
+// 如果还采用笛卡尔坐标系的话，需要根据距离计算出预估点的
 Vector2d CubicSpline2D::calc_position(double _s) const
 {
   double _x = sx.calc_position(_s);

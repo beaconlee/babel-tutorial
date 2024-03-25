@@ -18,10 +18,6 @@ cc_library(
         ":matplotlib",
         "//src/common/datastruct:kd_tree",
     ],
-    deps = [
-        "//src/common/datastruct:kd_tree",
-    ],
-
 )
 
 cc_library(
